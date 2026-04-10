@@ -1,0 +1,5 @@
+{
+    "thresh_binary": 0.600,
+    "thresh_severe": 0.500,
+    "features": "v1_12_ddk"
+}
