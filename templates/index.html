@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>말길 - 중증도 진단</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; background: #EAECF5; }
+        .phone-frame {
+            width: 100%; max-width: 390px; min-height: 100dvh;
+            background: #F8F9FF; overflow: hidden;
+            display: flex; flex-direction: column;
+            position: relative;
+        }
+        .screen { display: none; flex-direction: column; flex: 1; }
+        .screen.active { display: flex; }
+
+        /* 녹음 버튼 펄스 애니메이션 */
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(1.55); opacity: 0; }
+        }
+        .recording-pulse::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: #2563EB;
+            border-radius: 50%;
+            animation: pulse-ring 1.2s ease-out infinite;
+        }
+        .recording-pulse::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: #2563EB;
+            border-radius: 50%;
+            animation: pulse-ring 1.2s ease-out infinite 0.4s;
+        }
+
+        /* 화면 슬라이드 전환 */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .slide-up { animation: slideUp 0.4s ease-out; }
+
+        /* 진행 바 */
+        #progress-bar-fill { transition: width 0.4s ease; }
+
+        /* 결과 뱃지 팝 애니메이션 */
+        @keyframes pop {
+            0% { transform: scale(0.7); opacity: 0; }
+            70% { transform: scale(1.08); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .pop-in { animation: pop 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+<div class="phone-frame shadow-2xl">
+
+    <!-- ===== SCREEN 1: 프로필 입력 ===== -->
+    <div class="screen flex-col" id="screen-profile">
+        <div class="bg-blue-600 pt-14 pb-8 px-6 rounded-b-[2.5rem] shadow-lg">
+            <p class="text-blue-200 text-sm font-medium mb-1">말길 1단계</p>
+            <h1 class="text-white text-3xl font-black leading-tight">나만의<br>말길을<br>찾아요</h1>
+            <p class="text-blue-100 text-sm mt-3 leading-relaxed">목소리를 분석해 중증도를<br>정밀하게 측정합니다</p>
+        </div>
+
+        <div class="flex-1 px-6 py-8 space-y-5">
+            <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+                <h2 class="font-bold text-slate-700 text-base border-b pb-3">기본 정보 입력</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">나이 (만)</label>
+                        <input type="number" id="age" value="65" min="1" max="120"
+                               class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-3 text-lg font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">성별</label>
+                        <select id="sex"
+                                class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-3 text-base font-semibold focus:ring-2 focus:ring-blue-500 outline-none transition">
+                            <option value="M">남성</option>
+                            <option value="F">여성</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3 items-start">
+                <span class="text-blue-500 text-xl mt-0.5">ℹ️</span>
+                <p class="text-blue-700 text-sm leading-relaxed">조용한 공간에서 진행해주세요. 30개의 단어를 화면에 나오는 대로 소리 내어 읽으시면 됩니다.</p>
+            </div>
+        </div>
+
+        <div class="px-6 pb-10">
+            <button onclick="startRecording()" id="btn-start"
+                    class="w-full bg-blue-600 text-white text-xl font-bold py-4 rounded-2xl shadow-lg shadow-blue-500/30 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                시작하기
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== SCREEN 2: 단어 녹음 ===== -->
+    <div class="screen flex-col" id="screen-record">
+        <!-- 헤더 -->
+        <div class="bg-white px-5 pt-12 pb-3 border-b border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">과제 1 / 30</p>
+                    <h2 class="text-lg font-bold text-slate-800">단어 읽기</h2>
+                </div>
+                <div class="bg-blue-600 text-white text-sm font-bold px-3 py-1.5 rounded-full" id="counter-badge">1 / 30</div>
+            </div>
+            <!-- 진행 바 -->
+            <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500 rounded-full" id="progress-bar-fill" style="width:0%"></div>
+            </div>
+        </div>
+
+        <!-- 본문 -->
+        <div class="flex-1 flex flex-col items-center justify-center px-6 py-4 gap-6 slide-up" id="record-body">
+            <!-- 현재 단어 표시 -->
+            <div class="text-center">
+                <p class="text-slate-400 text-sm font-medium mb-2" id="word-instruction">"나무" 단어를 소리 내어 읽어 주세요</p>
+                <h1 class="text-7xl font-black text-slate-900 tracking-tight" id="current-word">나무</h1>
+            </div>
+
+            <!-- 녹음 버튼 -->
+            <div class="relative flex items-center justify-center w-36 h-36 mt-4" id="mic-btn-wrapper">
+                <button id="mic-btn" onclick="toggleRecord()"
+                        class="relative w-36 h-36 bg-blue-600 rounded-full shadow-xl shadow-blue-500/40 flex items-center justify-center transition-all active:scale-95">
+                    <!-- 마이크 아이콘 -->
+                    <svg id="icon-mic" class="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                    </svg>
+                    <!-- 정지 아이콘 (녹음 중 표시) -->
+                    <svg id="icon-stop" class="w-14 h-14 text-white hidden" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="6" y="6" width="12" height="12" rx="2"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- 녹음 상태 안내 -->
+            <div class="text-center">
+                <p id="rec-status" class="text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
+                    <span class="w-2 h-2 bg-slate-300 rounded-full inline-block" id="rec-dot"></span>
+                    <span id="rec-text">마이크 버튼을 눌러 녹음을 시작하세요</span>
+                </p>
+            </div>
+
+            <!-- 이전 녹음 완료 표시 -->
+            <div id="recorded-list" class="w-full mt-2 space-y-1 max-h-24 overflow-y-auto"></div>
+        </div>
+
+        <!-- 제출하기 버튼 (30개 완료 후 활성화) -->
+        <div class="px-6 pb-10 pt-2">
+            <button id="btn-submit" onclick="submitAll()" disabled
+                    class="w-full bg-slate-200 text-slate-400 text-xl font-bold py-4 rounded-2xl transition-all cursor-not-allowed">
+                제출하기 &gt;
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== SCREEN 3: 로딩 ===== -->
+    <div class="screen flex-col items-center justify-center gap-5 bg-white" id="screen-loading">
+        <div class="relative w-20 h-20">
+            <div class="w-20 h-20 rounded-full border-4 border-blue-100 border-t-blue-600 animate-spin"></div>
+        </div>
+        <div class="text-center">
+            <h3 class="text-2xl font-bold text-slate-800">AI 정밀 분석 중</h3>
+            <p class="text-slate-400 text-sm mt-2">목소리를 분석하고 있습니다<br>잠시만 기다려주세요</p>
+        </div>
+    </div>
+
+    <!-- ===== SCREEN 4: 결과 ===== -->
+    <div class="screen flex-col bg-slate-50 relative" id="screen-result">
+        <div class="bg-white px-5 pt-12 pb-4 border-b border-slate-100 shadow-sm z-10 sticky top-0">
+            <p class="text-xs text-blue-600 font-bold tracking-wide uppercase">진단 완료</p>
+            <h2 class="text-2xl font-extrabold text-slate-800">나만의 맞춤 재활 솔루션</h2>
+        </div>
+
+        <div class="flex-1 overflow-y-auto pb-32">
+            <!-- 상태 환산 점수 차트 -->
+            <div class="bg-white m-4 p-5 rounded-3xl shadow-sm border border-slate-100 slide-up" style="animation-delay: 0.1s">
+                <h3 class="text-lg font-bold text-slate-800 mb-1">건강 상태 분석</h3>
+                <p class="text-slate-500 text-sm mb-4">정상치(100점) 기준 현재 기능 상태입니다.</p>
+                <div class="relative w-full aspect-square flex items-center justify-center">
+                    <canvas id="healthRadarChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 중증도 배지 및 강도 -->
+            <div class="bg-white m-4 p-5 rounded-3xl shadow-sm border border-slate-100 slide-up" style="animation-delay: 0.2s">
+                <h3 class="text-lg font-bold text-slate-800 mb-3">종합 평가 및 추천 강도</h3>
+                <div id="severity-badge" class="py-4 rounded-xl text-center text-white font-black text-2xl shadow-lg mb-4 pop-in">
+                    분석 중...
+                </div>
+                <div class="bg-slate-50 rounded-xl p-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-slate-500 text-sm font-semibold">추천 운동 강도</span>
+                        <span id="sol-level" class="font-bold">...</span>
+                    </div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-slate-500 text-sm font-semibold">권장 세트/반복</span>
+                        <span id="sol-sets" class="text-slate-800 font-bold">...</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-500 text-sm font-semibold">권장 소요시간</span>
+                        <span id="sol-dur" class="text-slate-800 font-bold">...</span>
+                    </div>
+                </div>
+                <div class="mt-4 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex gap-2">
+                    <span class="text-indigo-500">💡</span>
+                    <p id="sol-focus" class="text-indigo-800 text-sm font-medium leading-snug">...</p>
+                </div>
+            </div>
+
+            <!-- 데일리 커리큘럼 리스트 -->
+            <div class="m-4 slide-up" style="animation-delay: 0.3s">
+                <h3 class="text-lg font-bold text-slate-800 mb-3 ml-2">오늘의 재활 커리큘럼</h3>
+                <div id="solution-list" class="space-y-3">
+                    <!-- JS inject -->
+                </div>
+            </div>
+        </div>
+
+        <div class="absolute bottom-0 w-full bg-white border-t border-slate-100 p-4 pb-8 z-20 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)]">
+            <button onclick="resetApp()"
+                    class="w-full bg-slate-800 text-white text-lg font-bold py-4 rounded-2xl hover:bg-slate-900 active:scale-95 transition-all shadow-xl shadow-slate-900/20">
+                훈련 마치고 처음으로
+            </button>
+        </div>
+    </div>
+
+</div><!-- /phone-frame -->
+
+<script>
+// ==================== 상수 ====================
+const WORDS = [
+    "나무","목도리","꽃","김밥","바지","사탕","풍선","국자",
+    "토끼","코끼리","해바라기","연필","호랑이","라면","냉장고",
+    "단추","곰","가방","똥","책상","자동차","빨간색","짹짹",
+    "그네","기차","접시","로봇","싸움","짜장면","포크"
+];
+const TOTAL = WORDS.length; // 30
+
+// ==================== 상태 ====================
+let currentIdx = 0;
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let recordedBlobs = new Array(TOTAL).fill(null); // 완료된 wav blob 보관
+
+// ==================== 화면 전환 ====================
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+// ==================== 1. 녹음 시작 (프로필 → 녹음 화면) ====================
+function startRecording() {
+    // 권한은 마이크 버튼을 처음 눌렀을 때 요청 (UX 개선)
+    currentIdx = 0;
+    recordedBlobs.fill(null);
+    updateRecordUI();
+    showScreen('screen-record');
+    document.getElementById('recorded-list').innerHTML = '';
+}
+
+// ==================== 2. 녹음 토글 ====================
+function toggleRecord() {
+    if (!isRecording) {
+        beginRecordWord();
+    } else {
+        stopRecordWord();
+    }
+}
+
+async function beginRecordWord() {
+    // 스트림이 없으면 마이크 권한 요청
+    if (!window._stream) {
+        try {
+            window._stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } catch(e) {
+            alert("마이크 권한이 필요합니다.\n브라우저 주소창 왼쪽의 자물쇠 아이콘을 눌러 마이크를 허용해주세요.");
+            return;
+        }
+    }
+
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(window._stream, { mimeType: preferredMime() });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = onRecordStop;
+    mediaRecorder.start();
+    isRecording = true;
+
+    // 버튼 UI 변경
+    const btn = document.getElementById('mic-btn');
+    btn.classList.add('recording-pulse', 'bg-red-500', 'shadow-red-400/50');
+    btn.classList.remove('bg-blue-600', 'shadow-blue-500/40');
+    document.getElementById('icon-mic').classList.add('hidden');
+    document.getElementById('icon-stop').classList.remove('hidden');
+
+    // 상태 안내
+    document.getElementById('rec-dot').classList.replace('bg-slate-300', 'bg-red-500');
+    document.getElementById('rec-text').textContent = '녹음 중... 버튼을 다시 눌러 완료';
+    document.getElementById('rec-text').classList.add('text-red-500');
+    document.getElementById('rec-text').classList.remove('text-slate-500');
+}
+
+function stopRecordWord() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    isRecording = false;
+
+    // 버튼 UI 복구
+    const btn = document.getElementById('mic-btn');
+    btn.classList.remove('recording-pulse', 'bg-red-500', 'shadow-red-400/50');
+    btn.classList.add('bg-blue-600', 'shadow-blue-500/40');
+    document.getElementById('icon-mic').classList.remove('hidden');
+    document.getElementById('icon-stop').classList.add('hidden');
+
+    document.getElementById('rec-dot').classList.replace('bg-red-500', 'bg-green-500');
+    document.getElementById('rec-text').textContent = '저장 중...';
+    document.getElementById('rec-text').classList.remove('text-red-500');
+}
+
+function onRecordStop() {
+    const blob = new Blob(audioChunks, { type: preferredMime() });
+    recordedBlobs[currentIdx] = blob;
+    markWordDone(WORDS[currentIdx]);
+
+    // 다음 단어로 이동
+    currentIdx++;
+    if (currentIdx < TOTAL) {
+        updateRecordUI();
+        document.getElementById('rec-dot').classList.replace('bg-green-500', 'bg-slate-300');
+        document.getElementById('rec-text').textContent = '마이크 버튼을 눌러 녹음을 시작하세요';
+    } else {
+        // 30개 완료!
+        document.getElementById('rec-dot').classList.replace('bg-green-500', 'bg-blue-500');
+        document.getElementById('rec-text').textContent = '30개 녹음 완료! 제출 버튼을 눌러주세요 ✅';
+        const btn = document.getElementById('btn-submit');
+        btn.disabled = false;
+        btn.classList.replace('bg-slate-200', 'bg-blue-600');
+        btn.classList.replace('text-slate-400', 'text-white');
+        btn.classList.replace('cursor-not-allowed', 'cursor-pointer');
+        btn.classList.add('shadow-lg', 'shadow-blue-500/30', 'hover:bg-blue-700');
+        document.getElementById('mic-btn').disabled = true;
+        document.getElementById('mic-btn').classList.add('opacity-40', 'cursor-not-allowed');
+    }
+}
+
+function markWordDone(word) {
+    const list = document.getElementById('recorded-list');
+    const item = document.createElement('div');
+    item.className = 'flex items-center gap-2 text-sm text-slate-600 bg-green-50 px-3 py-1.5 rounded-xl animate-fade';
+    item.innerHTML = `<span class="text-green-500 font-bold">✓</span> <span class="font-semibold">${word}</span> <span class="text-slate-400 text-xs">녹음 완료</span>`;
+    list.prepend(item);
+}
+
+// ==================== UI 업데이트 ====================
+function updateRecordUI() {
+    const word = WORDS[currentIdx];
+    document.getElementById('current-word').textContent = word;
+    document.getElementById('word-instruction').textContent = `"${word}" 단어를 소리 내어 읽어 주세요`;
+    document.getElementById('counter-badge').textContent = `${currentIdx + 1} / ${TOTAL}`;
+    const pct = (currentIdx / TOTAL) * 100;
+    document.getElementById('progress-bar-fill').style.width = pct + '%';
+}
+
+// ==================== 3. 서버 전송 ====================
+async function submitAll() {
+    const age = document.getElementById('age').value;
+    const sex = document.getElementById('sex').value;
+
+    showScreen('screen-loading');
+
+    const formData = new FormData();
+    formData.append('age', age);
+    formData.append('sex', sex);
+
+    const ext = preferredMime().includes('ogg') ? 'ogg' : 'webm';
+    for (let i = 0; i < TOTAL; i++) {
+        if (recordedBlobs[i]) {
+            // 파일명을 단어명으로 지정하여 inference.py가 매핑 가능하도록
+            formData.append('files', recordedBlobs[i], `${WORDS[i]}.${ext}`);
+        }
+    }
+
+    try {
+        const res = await fetch('/api/diagnose', { method: 'POST', body: formData });
+        const json = await res.json();
+        if (res.ok && json.data) {
+            showResult(json.data);
+        } else {
+            alert('서버 오류: ' + JSON.stringify(json));
+            showScreen('screen-record');
+        }
+    } catch(e) {
+        alert('통신 오류가 발생했습니다: ' + e.message);
+        showScreen('screen-record');
+    }
+}
+
+let radarChartInstance = null;
+
+// ==================== 4. 결과 표시 ====================
+function showResult(data) {
+    const label = data.prediction.severity_label;
+    const solution = data.solution; // From solution_engine.py
+
+    // --- 중증도 배지 및 강도 ---
+    const badge = document.getElementById('severity-badge');
+    const solLevel = document.getElementById('sol-level');
+    const solSets = document.getElementById('sol-sets');
+    const solDur = document.getElementById('sol-dur');
+    const solFocus = document.getElementById('sol-focus');
+
+    // color_theme values: "success", "warning", "danger" (from python backend)
+    let themeColor = solution ? solution.intensity_plan.color_theme : "warning";
+    
+    if (themeColor === "success" || label.includes('정상')) {
+        badge.textContent = '정상 수준';
+        badge.className = 'w-full py-5 rounded-2xl text-white text-3xl font-black shadow-xl text-center bg-emerald-500 shadow-emerald-500/40 pop-in';
+        solLevel.className = 'text-emerald-600 font-extrabold';
+    } else if (themeColor === "danger" || label.includes('고도')) {
+        badge.textContent = '집중 훈련 고도 단계';
+        badge.className = 'w-full py-5 rounded-2xl text-white text-3xl font-black shadow-xl text-center bg-rose-600 shadow-rose-600/40 pop-in';
+        solLevel.className = 'text-rose-600 font-extrabold';
+    } else {
+        badge.textContent = '적극적 재활 단계';
+        badge.className = 'w-full py-5 rounded-2xl text-white text-3xl font-black shadow-xl text-center bg-amber-500 shadow-amber-500/40 pop-in';
+        solLevel.className = 'text-amber-600 font-extrabold';
+    }
+
+    if (solution) {
+        solLevel.textContent = solution.intensity_plan.level;
+        solSets.textContent = `${solution.intensity_plan.sets}세트 × ${solution.intensity_plan.reps}회`;
+        solDur.textContent = solution.intensity_plan.duration;
+        solFocus.textContent = solution.intensity_plan.focus;
+
+        // --- 레이더 차트 그리기 ---
+        const scores = solution.health_scores;
+        const ctx = document.getElementById('healthRadarChart').getContext('2d');
+        
+        if(radarChartInstance) radarChartInstance.destroy();
+        
+        radarChartInstance = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['조음 (발음/모음왜곡)', '발성 (음질/호흡)', '운율 (피치/리듬)'],
+                datasets: [{
+                    label: '기능 점수',
+                    data: [scores.articulation_resonance, scores.respiration_phonation, scores.prosody],
+                    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                    borderColor: 'rgba(37, 99, 235, 1)',
+                    pointBackgroundColor: 'rgba(37, 99, 235, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(37, 99, 235, 1)',
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        angleLines: { color: 'rgba(0, 0, 0, 0.05)' },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                        pointLabels: { font: { family: "'Noto Sans KR', sans-serif", size: 12, weight: 'bold' } },
+                        min: 0,
+                        max: 100,
+                        ticks: { stepSize: 20, display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        // --- 솔루션 리스트 렌더링 ---
+        const listDiv = document.getElementById('solution-list');
+        listDiv.innerHTML = '';
+        
+        solution.recommended_exercises.forEach((ex, idx) => {
+            const card = document.createElement('div');
+            card.className = "bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex gap-4 items-center";
+            
+            // 번호 서클
+            const numBox = document.createElement('div');
+            numBox.className = "w-10 h-10 shrink-0 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-lg";
+            numBox.textContent = idx + 1;
+            
+            // 텍스트 블록
+            const textBlock = document.createElement('div');
+            const title = document.createElement('h4');
+            title.className = "text-slate-800 font-bold text-base mb-1";
+            title.textContent = ex.name;
+            const desc = document.createElement('p');
+            desc.className = "text-slate-500 text-xs leading-relaxed";
+            desc.textContent = ex.desc;
+            
+            textBlock.appendChild(title);
+            textBlock.appendChild(desc);
+            
+            card.appendChild(numBox);
+            card.appendChild(textBlock);
+            
+            listDiv.appendChild(card);
+        });
+
+    }
+
+    showScreen('screen-result');
+}
+
+// ==================== 리셋 ====================
+function resetApp() {
+    currentIdx = 0;
+    recordedBlobs.fill(null);
+    isRecording = false;
+    document.getElementById('recorded-list').innerHTML = '';
+    document.getElementById('mic-btn').disabled = false;
+    document.getElementById('mic-btn').classList.remove('opacity-40', 'cursor-not-allowed');
+    const submitBtn = document.getElementById('btn-submit');
+    submitBtn.disabled = true;
+    submitBtn.className = 'w-full bg-slate-200 text-slate-400 text-xl font-bold py-4 rounded-2xl transition-all cursor-not-allowed';
+    showScreen('screen-profile');
+}
+
+// ==================== 초기 화면 분기 (URL 파라미터 체크) ====================
+function routeByParam() {
+    console.log("Routing by URL parameters...");
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    
+    if (view === 'record') {
+        console.log("Displaying RECORD screen");
+        startRecording();
+    } else if (view === 'result') {
+        console.log("Displaying RESULT screen (Simulation)");
+        showResult({
+            "prediction": {
+                "severity_label": "경도-중등도 (Mild-to-Moderate)",
+                "confidence_score": 0.72,
+                "probabilities": {
+                    "정상 (Normal)": 0.18,
+                    "경도-중등도 (Mild-to-Moderate)": 0.72,
+                    "고도 (Severe)": 0.10
+                }
+            },
+            "solution": {
+                "health_scores": {
+                    "articulation_resonance": 43.4,
+                    "respiration_phonation": 87.7,
+                    "prosody": 91.3
+                },
+                "weakest_category": "articulation_resonance",
+                "overall_severity": "경도-중등도 (Mild-to-Moderate)",
+                "intensity_plan": {
+                    "level": "강화 (High-Intensity)",
+                    "sets": 3,
+                    "reps": 10,
+                    "duration": "하루 20~30분",
+                    "focus": "취약 영역 적극 개선, 말 명료도 수치 집중 회복",
+                    "color_theme": "warning"
+                },
+                "recommended_exercises": [
+                    {
+                        "id": 2,
+                        "name": "구강 운동 (Oral motor exercises)",
+                        "desc": "입술, 볼, 턱, 혀를 움직이는 체조를 통해 조음 기관의 가동 범위를 넓힙니다.",
+                        "category": "articulation_resonance"
+                    },
+                    {
+                        "id": 10,
+                        "name": "최소 대립쌍 읽기 (Contrast drills)",
+                        "desc": "발음 차이가 미세한 두 단어(예: 달/탈)의 짝을 명확하게 구분하여 읽습니다.",
+                        "category": "articulation_resonance"
+                    },
+                    {
+                        "id": 1,
+                        "name": "자세 교정 (Posture correction)",
+                        "desc": "영상에 따라 바른 자세를 유지하며 발성을 위한 호흡 지지력을 확보합니다.",
+                        "category": "respiration_phonation"
+                    },
+                    {
+                        "id": 12,
+                        "name": "호흡 훈련 (Breathing exercises)",
+                        "desc": "입과 코를 따로 사용하여 일정 시간 동안 깊게 숨을 들이마시고 내쉽니다.",
+                        "category": "respiration_phonation"
+                    }
+                ]
+            }
+        });
+    } else {
+        console.log("Displaying PROFILE screen (Default)");
+        showScreen('screen-profile');
+    }
+}
+
+// 스크립트 로드 완료 시 또는 페이지 로드 완료 시 실행
+if (document.readyState === 'complete') {
+    routeByParam();
+} else {
+    window.addEventListener('load', routeByParam);
+}
+
+// ==================== 유틸 ====================
+function preferredMime() {
+    const types = ['audio/wav', 'audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm'];
+    return types.find(t => MediaRecorder.isTypeSupported(t)) || 'audio/webm';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+{
+  "added_tokens_decoder": {
+    "40": {
+      "content": "|",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "41": {
+      "content": "[UNK]",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "42": {
+      "content": "[PAD]",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "43": {
+      "content": "<s>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "44": {
+      "content": "</s>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "45": {
+      "content": "{'content': '<s>', 'lstrip': False, 'normalized': True, 'rstrip': False, 'single_word': False}",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "46": {
+      "content": "{'content': '</s>', 'lstrip': False, 'normalized': True, 'rstrip': False, 'single_word': False}",
+      "lstrip": false,
+      "normalized": true,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    }
+  },
+  "backend": "custom",
+  "bos_token": "<s>",
+  "do_phonemize": false,
+  "eos_token": "</s>",
+  "extra_special_tokens": [
+    "{'content': '<s>', 'lstrip': False, 'normalized': True, 'rstrip': False, 'single_word': False}",
+    "{'content': '</s>', 'lstrip': False, 'normalized': True, 'rstrip': False, 'single_word': False}"
+  ],
+  "is_local": false,
+  "model_max_length": 1000000000000000019884624838656,
+  "model_specific_special_tokens": {
+    "phone_delimiter_token": "|"
+  },
+  "pad_token": "[PAD]",
+  "phone_delimiter_token": "|",
+  "phonemizer_backend": "espeak",
+  "phonemizer_lang": "en-us",
+  "processor_class": "Wav2Vec2Processor",
+  "tokenizer_class": "Wav2Vec2PhonemeCTCTokenizer",
+  "unk_token": "[UNK]",
+  "word_delimiter_token": null
+}
