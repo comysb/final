@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Project Specific
+user_db.json
+.env
+data/
+*.log
+
+# Large Binaries & Backups (Prevent GitHub 100MB limit issues)
+*.zip
+*.pdf
+*.pptx
+*.pkl
+eval_results.txt
+extracted_features.csv
+
+# OS generated files
+.DS_Store
+Thumbs.db
