@@ -1,0 +1,2 @@
+function stopAllRecorders(promptText) {
+  if (window._liveRecorder) { window._liveRecorder.stop(promptText); window._liveRecorder = null; }
